@@ -3,82 +3,120 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Election is Ownable {
-	string public name = "Election";
+    string public name = "Election";
 
-	struct Candidate {
-		uint id;
-		uint voteCount;
-		string name;
-		address owner;
-	}
+    struct Candidate {
+        uint256 id;
+        uint256 voteCount;
+        string name;
+        address candidate;
+    }
 
-	mapping(address => bool) public voters;
-	mapping(uint => Candidate) public candidates;
-	mapping(address => uint) public addressToCandidateId;
+    struct Voter {
+        uint256 id;
+        bool voted;
+        string name;
+        address voter;
+    }
 
-	event CandidateAdded(
-		uint id,
-		uint voteCount,
-		string name,
-		address owner
-	);
+    mapping(uint256 => Voter) public voters;
+    mapping(uint256 => Candidate) public candidates;
 
-	event VoterRegistered(
-		address voter
-	);
+    mapping(address => uint256) public addressToCandidateId;
+    mapping(address => uint256) public addressToVoterId;
 
-	event ElectionDateUpdated(
-		uint time
-	);
+    event CandidateAdded(
+        uint256 id,
+        uint256 voteCount,
+        string name,
+        address candidate
+    );
 
-	event VoteCasted(
-		address voter,
-		uint candidateId
-	);
+    event VoterRegistered(uint256 id, string name, address voter);
 
-	uint public candidatesCount;
-	uint public votersCount;
+    event ElectionDateUpdated(uint256 time);
 
-	uint public electionDate;
+    event VoteCasted(
+        uint256 id,
+        bool voted,
+        string name,
+        address voter,
+        uint256 candidateId
+    );
 
-	constructor(uint _time) {
-		require(_time > block.timestamp, "Time must be higher than current time");
-		electionDate = _time;
-		
-	}
+    uint256 public candidatesCount;
+    uint256 public votersCount;
 
-	function addCandidate(string memory _name, address _candidate) public onlyOwner {
-		require(addressToCandidateId[_candidate] != 0, "Candidate already exists");
-		candidatesCount++;
-		candidates[candidatesCount] = Candidate(candidatesCount, 0, _name, _candidate);
-		addressToCandidateId[_candidate] = candidatesCount;
-		emit CandidateAdded(candidatesCount, 0, _name, _candidate);
-	}
+    uint256 public electionDate;
 
-	// test voter already voted
-	// add register time limit
-	function registerVoter() public {
-		require(!voters[msg.sender], "Voter already exists");
-		votersCount++;
-		voters[msg.sender] = true;
-		emit VoterRegistered(msg.sender);
-	}
+    constructor(uint256 _time) {}
 
-	// disable voting when time ends 
-	function castVote(uint _candidateId) public {
-		require(voters[msg.sender], "Voter not registered");
-		require(candidates[_candidateId].owner == msg.sender, "Candidate does not exist");
-		Candidate memory candidate = candidates[_candidateId];
-		candidate.voteCount++;
-		candidates[_candidateId] = candidate;
-		voters[msg.sender] = false;
-		emit VoteCasted(msg.sender, _candidateId);
-	}
+    function addCandidate(string memory _name, address _candidate)
+        public
+        onlyOwner
+    {
+        require(
+            addressToCandidateId[_candidate] != 0,
+            "Candidate already exists"
+        );
+        candidatesCount++;
+        candidates[candidatesCount] = Candidate(
+            candidatesCount,
+            0,
+            _name,
+            _candidate
+        );
+        addressToCandidateId[_candidate] = candidatesCount;
+        emit CandidateAdded(candidatesCount, 0, _name, _candidate);
+    }
 
-	// must get the candidate with the higher votes
-	// function getWinnerCandidate(uint _candidateId) view public returns(uint) {
-	// 	require(candidates[_candidateId], "Candidate does not exist");
-	// 	return candidates[_candidateId];
-	// }
+    function setElectionDate(uint256 _time) public {
+        require(
+            _time > block.timestamp,
+            "Time must be higher than the current time"
+        );
+        electionDate = _time;
+    }
 
+    // test voter already voted
+    // add register time limit
+    function registerVoter(string memory _name) public {
+        require(addressToVoterId[msg.sender] != 0, "Voter already exists");
+				require(block.timestamp < electionDate, "Registrations are closed");
+        votersCount++;
+        voters[votersCount] = Voter(votersCount, false, _name, msg.sender);
+        addressToVoterId[msg.sender] = votersCount;
+        emit VoterRegistered(votersCount, _name, msg.sender);
+    }
+
+    // disable voting when time ends
+    function castVote(uint256 _candidateId) public {
+				uint voterId = addressToVoterId[msg.sender];
+        require(voterId != 0, "Voter not registered");
+        require(_candidateId > 0, "Candidate does not exist");
+        require(
+            candidates[_candidateId].candidate != address(0),
+            "Candidate does not exist"
+        );
+				require(block.timestamp > electionDate && block.timestamp < electionDate + 24*3600, "Election has ended, Votes cannot be accepted");
+        Voter memory voter = voters[voterId];
+        require(voter.voted == false, "Voter already voted");
+        voter.voted = true;
+        Candidate memory candidate = candidates[_candidateId];
+        candidate.voteCount++;
+        candidates[_candidateId] = candidate;
+        emit VoteCasted(
+            voter.id,
+            voter.voted,
+            voter.name,
+            msg.sender,
+            candidate.id
+        );
+    }
+
+    // must get the candidate with the higher votes
+    // function getWinnerCandidate(uint _candidateId) view public returns(uint) {
+    // 	require(candidates[_candidateId], "Candidate does not exist");
+    // 	return candidates[_candidateId];
+    // }
 }
