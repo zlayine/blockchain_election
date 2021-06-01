@@ -58,12 +58,14 @@ class App extends Component {
 				...this.state,
 				owner: owner == accounts[0]
 			});
-			const voterId = (await contract.methods.addressToVoterId(accounts[0]).call()).toNumber();
-			const voter = await contract.methods.voters(voterId).call();
-			this.setState({
-				...this.state,
-				voter: voter
-			})
+			const voterId = await contract.methods.addressToVoterId(accounts[0]).call();
+			if (voterId.toNumber() > 0) {
+				const voter = await contract.methods.voters(voterId.toNumber()).call();
+				this.setState({
+					...this.state,
+					voter: voter
+				})
+			}
 			const electionDate = (await contract.methods.electionDate().call()).toNumber() * 1000;
 			this.setState({
 				...this.state,
@@ -84,31 +86,53 @@ class App extends Component {
 		}
 	}
 
-	setElectionDate = async () => {
+	setElectionDate = () => {
 		const date = new Date();
-		const res = await this.state.contract.methods.setElectionDate(parseInt((date.getTime()) / 1000) + 20).send({ from: this.state.account });
+		const electDate = date.getTime() + 5 * 60 * 1000;
+		this.state.contract.methods.setElectionDate(parseInt(electDate / 1000)).send({ from: this.state.account }).on('transactionHash', (hash) => {
+			this.setState({
+				...this.state,
+				electionDate: electDate
+			})
+		})
 	}
 
 	enableAdd = () => {
 		this.setState({
 			...this.state,
-			addCandidate: true,
+			addCandidate: !this.state.addCandidate,
 		})
 	}
 
 	addCandidate = () => {
+		if (!this.state.owner)
+			return;
 		this.state.contract.methods.addCandidate(this.state.candidateName, this.state.candidateAddress).send({ from: this.state.account }).on('transactionHash', (hash) => {
-			console.log("hash", hash);
 		});
 	}
 
 	registerVoter = () => {
-		this.state.contract.methods.registerVoter("Voter").send({ from: this.state.account });
-
+		if (this.state.electionDate < (new Date()).getTime())
+			alert("Registrations are closed");
+		else
+			this.state.contract.methods.registerVoter("Voter").send({ from: this.state.account }).on('transactionHash', (hash) => {
+				window.location.reload();
+			});
 	}
 
 	castVote = (id) => {
-		this.state.contract.methods.castVote(id).send({ from: this.state.account });
+		if (this.state.voter.voted)
+			alert("Already voted");
+		else
+			this.state.contract.methods.castVote(id).send({ from: this.state.account }).on('transactionHash', () => {
+				this.setState({
+					...this.state,
+					voter: {
+						...this.state.voter,
+						voted: true,
+					}
+				})
+			});
 	}
 
 	handleChange = (e) => {
@@ -120,14 +144,17 @@ class App extends Component {
 
 	getDate = (time) => {
 		let d = new Date(time);
+		let seconds = d.getSeconds() < 10 ? `0${d.getSeconds()}` : d.getSeconds();
 		let minutes = d.getMinutes() < 10 ? `0${d.getMinutes()}` : d.getMinutes();
 		let hours = d.getHours() < 10 ? `0${d.getHours()}` : d.getHours();
 		let day = d.getDate() < 10 ? `0${d.getDate()}` : d.getDate();
 		let month = d.getMonth() + 1 < 10 ? `0${d.getMonth() + 1}` : d.getMonth() + 1;
-		return `${day} ${month} ${d.getFullYear()} at ${hours}:${minutes}`;
+		return `${day} ${month} ${d.getFullYear()} at ${hours}:${minutes}:${seconds}`;
 	}
 
+
 	render() {
+		const isElectStarted = this.state.electionDate < (new Date()).getTime();
 		return (
 			<div>
 				<nav className="navbar navbar-dark bg-dark flex-md-nowrap p-3 shadow">
@@ -147,10 +174,12 @@ class App extends Component {
 				<div className="container-fluid mt-5">
 					<div className="row">
 						<main role="main" className="container d-flex flex-column text-center">
-							<div className="d-flex flex-row justify-content-between">
-								<button className="btn" onClick={this.setElectionDate} >Set Election date</button>
-								<button className="btn" onClick={this.enableAdd} >Add Candidate</button>
-							</div>
+							{this.state.owner ? (
+								<div className="d-flex flex-row justify-content-between">
+									<button className="btn" onClick={this.setElectionDate} >Set Election date</button>
+									<button className="btn" onClick={this.enableAdd} >Add Candidate</button>
+								</div>
+							) : ""}
 							{this.state.addCandidate ? (
 								<div className="mx-auto d-flex flex-row mb-4">
 									<input type="text" className="mr-3" onChange={this.handleChange} name="candidateName" placeholder="Candidate Name" />
@@ -159,14 +188,23 @@ class App extends Component {
 								</div>
 							) : ""}
 							<div className="content mr-auto ml-auto">
-								<h1 className="d-4 mb-3">Start elections! | Election starts at: {this.getDate(this.state.electionDate)}</h1>
+								{
+									isElectStarted ? (
+										<h1 className="d-4 mb-3">Election ends : {this.getDate(this.state.electionDate + 2 * 60 * 60 * 1000)}</h1>
+									) : (
+										<h1 className="d-4 mb-3">Election starts : {this.getDate(this.state.electionDate)}</h1>
+									)
+								}
 								<h5 className="mb-3">Candidates</h5>
 								<div className="d-flex flex-row justify-content-between mb-4" >
 									{this.state.candidates.map(c => {
 										return (
-											<div className="candidate mx-3" key={c.id.toNumber()} onClick={() => this.castVote(c.id.toNumber())}>
-												<label className="name m-auto">{c.name}</label>
-												<label className="name mt-auto">{c.voteCount.toNumber()}</label>
+											<div className="candidate flex-column mx-3" key={c.id.toNumber()} onClick={() => this.castVote(c.id.toNumber())}>
+												<img className="img" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=2600&q=80" alt="profile candindate" />
+												<div className="d-flex justify-content-between mt-auto p-2">
+													<label className="name">{c.name}</label>
+													<label className="vote">{c.voteCount.toNumber()}</label>
+												</div>
 											</div>
 										)
 									})}
@@ -177,11 +215,14 @@ class App extends Component {
 									this.state.voter.voted ? (
 										<div className="btn mx-auto">Voted</div>
 									) : (
-										<div className="btn mx-auto">Registered</div>
+										<div className="btn mx-auto">Registered..Wait for election to start</div>
+									) : !isElectStarted ? (
+										<button className="btn mx-auto mb-3" onClick={this.registerVoter}>Register To Vote</button>
 									) : (
-										<button className="btn mx-auto mb-3" onClick={this.registerVoter}>Register</button>
+										<div className="btn mx-auto">Registrations are closed</div>
 									)}
 							</div>
+
 						</main>
 					</div>
 				</div>

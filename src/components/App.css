@@ -1,6 +1,5 @@
 .candidate {
-	width: 100px;
-	height: 120px;
+	width: 220px;
 	border-radius: 10px;
 	display: flex;
 	border: 1px solid #8b8b8b;
@@ -21,4 +20,13 @@
 }
 .btn:hover {
 	box-shadow: none;
+}
+
+.candidate .name {
+	font-weight: 700;
+	text-transform: capitalize;
+}
+
+.img {
+	width: 100%;
 }

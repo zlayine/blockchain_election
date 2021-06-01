@@ -70,7 +70,7 @@ contract Election is Ownable {
         emit CandidateAdded(candidatesCount, 0, _name, _candidate);
     }
 
-    function setElectionDate(uint256 _time) public onlyOwner {
+    function setElectionDate(uint256 _time) public onlyOwner{
         require(
             _time >= block.timestamp,
             "Time must be higher than the current time"
