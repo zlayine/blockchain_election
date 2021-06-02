@@ -47,6 +47,7 @@ contract Election is Ownable {
     event Log(uint256 data);
 
     uint256 public candidatesCount;
+
     uint256 public votersCount;
 
     uint256 public electionDate;
@@ -97,7 +98,7 @@ contract Election is Ownable {
             "Candidate does not exist"
         );
         require(
-            block.timestamp >= electionDate,
+            block.timestamp >= electionDate && block.timestamp < electionDate + 2 * 3600,
             "Election has ended, Votes cannot be accepted"
         );
         Voter memory voter = voters[voterId];
@@ -119,7 +120,7 @@ contract Election is Ownable {
     function getWinnerCandidate()
         public
         view
-        returns (uint256 id, uint voteCount, string memory name)
+        returns (uint256 id, uint voteCount, string memory _name)
     {
         Candidate memory winner;
         winner = candidates[1];

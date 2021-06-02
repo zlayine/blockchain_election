@@ -65,11 +65,9 @@ contract("Election", ([alice, bob, john, frank, lee]) => {
 			assert.equal(event.voter, frank);
 
 			await election.registerVoter("frank", { from: frank }).should.be.rejected;
+			
+			await election.registerVoter("lee", { from: lee })
 
-			await election.setElectionDate(parseInt(new Date().getTime() / 1000) + 2);
-			setTimeout(async () => {
-				await election.registerVoter("lee", { from: lee }).should.be.rejected;
-			}, 3000);
 		})
 
 
@@ -83,32 +81,32 @@ contract("Election", ([alice, bob, john, frank, lee]) => {
 			assert.equal(event.name, "frank");
 			assert.equal(event.voter, frank);
 			assert.equal(event.candidateId, 1);
-
+			
 			// tesing vote from invalid sender
 			await election.castVote(1, { from: 0x0 }).should.be.rejected;
 			// testing vote for invalid candidate
 			await election.castVote(3).should.be.rejected;
 			// testing vote from unregistered user
-			await election.castVote(1, { from: lee }).should.be.rejected;
+			await election.castVote(1, { from: lee });
 			// testing revote from same person
 			await election.castVote(1, { from: frank }).should.be.rejected;
 		})
 
 		it("check voting count", async () => {
 			result = await election.votersCount();
-			assert.equal(result.toNumber(), 1);
+			assert.equal(result.toNumber(), 2);
 		})
 
-		it("check candidate vote", async () => {
+		it("check candidate votes", async () => {
 			result = await election.candidates(1);
-			assert.equal(result.voteCount, 1);
+			assert.equal(result.voteCount, 2);
 		})
 
 		it("get winner candidate", async () => {
 			result = await election.getWinnerCandidate()
 			assert.equal(result.id.toNumber(), 1);			
-			assert.equal(result.voteCount.toNumber(), 1);			
-			assert.equal(result.name, "bob");			
+			assert.equal(result.voteCount.toNumber(), 2);			
+			assert.equal(result._name, "bob");			
 		});
 
 	});

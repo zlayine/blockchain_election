@@ -26,11 +26,12 @@ class App extends Component {
 	async componentWillMount() {
 		await this.loadWeb3()
 		await this.loadBlockchainData()
+		this.listenEthEvents();
 	}
 
 	async loadWeb3() {
 		if (window.ethereum) {
-			window.web3 = new Web3(window.ethereum)
+			window.web3 = new Web3('ws://localhost:7545')
 			await window.ethereum.enable()
 		}
 		else if (window.web3) {
@@ -84,6 +85,16 @@ class App extends Component {
 		} else {
 			alert('Smart contract not deployed to detected network.')
 		}
+	}
+
+	listenEthEvents() {
+		this.state.contract.events.ElectionDateUpdated().on('data', async (event) => {
+			console.log(event.returnValues);
+		})
+
+		this.state.contract.events.CandidateAdded().on('data', async (event) => {
+
+		})
 	}
 
 	setElectionDate = () => {
@@ -187,33 +198,40 @@ class App extends Component {
 									<button className="btn" onClick={this.addCandidate}>Save</button>
 								</div>
 							) : ""}
-							<div className="content mr-auto ml-auto">
-								{
-									isElectStarted ? (
-										<h1 className="d-4 mb-3">Election ends : {this.getDate(this.state.electionDate + 2 * 60 * 60 * 1000)}</h1>
-									) : (
-										<h1 className="d-4 mb-3">Election starts : {this.getDate(this.state.electionDate)}</h1>
-									)
-								}
-								<h5 className="mb-3">Candidates</h5>
-								<div className="d-flex flex-row justify-content-between mb-4" >
-									{this.state.candidates.map(c => {
-										return (
-											<div className="candidate flex-column mx-3" key={c.id.toNumber()} onClick={() => this.castVote(c.id.toNumber())}>
-												<img className="img" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=2600&q=80" alt="profile candindate" />
-												<div className="d-flex justify-content-between mt-auto p-2">
-													<label className="name">{c.name}</label>
-													<label className="vote">{c.voteCount.toNumber()}</label>
-												</div>
-											</div>
-										)
-									})}
-								</div>
-							</div>
+							{
+								this.state.electionDate > 0 ? (
+									<div className="content mr-auto ml-auto">
+										{
+											isElectStarted ? (
+												<h1 className="d-4 mb-3">Election ends : {this.getDate(this.state.electionDate + 2 * 60 * 60 * 1000)}</h1>
+											) : (
+												<h1 className="d-4 mb-3">Election starts : {this.getDate(this.state.electionDate)}</h1>
+											)
+										}
+										<h5 className="mb-3">Candidates</h5>
+										<div className="d-flex flex-row justify-content-between mb-4" >
+											{this.state.candidates.map(c => {
+												return (
+													<div className="candidate flex-column mx-3" key={c.id.toNumber()} onClick={() => this.castVote(c.id.toNumber())}>
+														<img className="img" src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&ixlib=rb-1.2.1&auto=format&fit=crop&w=2600&q=80" alt="profile candindate" />
+														<div className="d-flex justify-content-between mt-auto p-2">
+															<label className="name">{c.name}</label>
+															<label className="vote">{c.voteCount.toNumber()}</label>
+														</div>
+													</div>
+												)
+											})}
+										</div>
+									</div>
+								) : ""
+							}
+
 							<div className="d-flex flex-column">
 								{this.state.voter ?
 									this.state.voter.voted ? (
 										<div className="btn mx-auto">Voted</div>
+									) : isElectStarted ? (
+										<div className="btn mx-auto">Vote for a candidate</div>
 									) : (
 										<div className="btn mx-auto">Registered..Wait for election to start</div>
 									) : !isElectStarted ? (
